@@ -17,7 +17,7 @@ snap() {
     cat <<EOF
 Usage: snap [OPTIONS] [DIRECTORY]
 
-Concatenates readable source/text files into one snapshot file for LLM workflows.
+Concatenates readable source/text files into one snapshot file.
 
 Options:
   --output <file>         Set output file path (default: ./snap.txt)
