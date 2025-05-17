@@ -14,6 +14,28 @@ These dotfiles are designed for portability, clarity, and ease of management acr
 
 ---
 
+## 🛠️ Initialization
+
+Before installing any modules, clone the repository and prepare the environment:
+
+```bash
+cd ~
+git clone https://github.com/neox5/dotfiles.git
+cd dotfiles
+
+# Install GNU stow (required for managing symlinks)
+# Debian/Ubuntu:
+sudo apt install stow
+
+# Arch Linux:
+sudo pacman -S stow
+
+# Make all lifecycle scripts executable
+chmod +x *.sh scripts/*.sh
+```
+
+---
+
 ## 🚀 How to Install
 
 ```bash
