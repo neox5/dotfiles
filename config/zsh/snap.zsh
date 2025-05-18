@@ -109,7 +109,7 @@ EOF
   fi
 
   # Concatenate project files
-  find "$abs_source_dir" -type f ! -path '*/.*' | sort | while IFS= read -r file; do
+  find "$abs_source_dir" -type f | sort | while IFS= read -r file; do
     [[ "$(realpath "$file")" == "$abs_output_file" ]] && continue
     _snap_should_include "$file" || continue
     _snap_is_text_file "$file" || continue
