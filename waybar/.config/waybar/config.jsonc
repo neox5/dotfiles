@@ -1,0 +1,58 @@
+{
+  "modules-left": ["sway/workspaces", "custom/spotify"],
+  "modules-center": ["sway/window"],
+  "modules-right": [
+    "pulseaudio",
+    "network",
+    "cpu",
+    "memory",
+    "custom/bluetooth",
+    "clock"
+  ],
+
+  "sway/workspaces": {},
+
+  "sway/window": {
+    "max-length": 50
+  },
+
+  "cpu": {
+    "format": "{}% "
+  },
+
+  "memory": {
+    "format": "{}% "
+  },
+
+  "battery": {
+    "format": "{capacity}% {icon}",
+    "format-icons": ["", "", "", "", ""]
+  },
+
+  "custom/bluetooth": {
+    "exec": "~/.config/waybar/scripts/bluetooth.sh",
+    "interval": 1,
+    "on-click": "blueman-manager",
+    "return-type": "json",
+    "align": 0
+  },
+
+  "network": {
+    "format-wifi": "{essid} ({signalStrength}%) ",
+    "format-ethernet": "{ifname} ",
+    "format-disconnected": "Disconnected ⚠"
+  },
+
+  "pulseaudio": {
+    "format": "{volume}% {icon}",
+    "format-muted": "",
+    "format-icons": ["", ""]
+  },
+
+  "custom/spotify": {
+    "format": " {}",
+    "max-length": 40,
+    "exec": "$HOME/.bin/mediaplayer.sh",
+    "exec-if": "pgrep spotify"
+  }
+}
