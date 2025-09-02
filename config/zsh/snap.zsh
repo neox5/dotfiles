@@ -1,17 +1,32 @@
-#!/usr/bin/env zsh
 # snap - Concatenate readable source files into a single snapshot file
 # Usage:
-#   snap [--output <file>] [--exclude-git-log] [--exclude-exts <ext1,ext2>] [--verbose] [<directory>]
+#   snap [--output <file>] [--include <pattern>] [--exclude <pattern>] [--exclude-git-log] [<directory>]
 # Example:
-#   snap --output context.txt --exclude-exts mp3,wav,jpg --verbose project/
+#   snap --output context.txt --include "*.py" --include "*.md" --exclude "**/*_test.py" project/
 
 snap() {
   local source_dir="."
   local output_file="snap.txt"
-  local exclude_exts=()
+  local include_patterns=()
+  local exclude_patterns=()
   local include_git_log=true
   local overwrite=false
-  local verbose=false
+
+  # Default excludes - always applied
+  local default_excludes=(
+    ".git/**" "node_modules/**" ".venv/**" "venv/**" "__pycache__/**"
+    ".pytest_cache/**" "dist/**" "build/**" "target/**" "vendor/**"
+    "*.log" "*.tmp" "**/snap.txt" "**/*.snap.txt"
+  )
+
+  # Binary/media file extensions - mentioned but content omitted
+  local binary_extensions=(
+    "*.exe" "*.dll" "*.so" "*.dylib" "*.a"
+    "*.zip" "*.tar" "*.gz" "*.7z" "*.rar"
+    "*.png" "*.jpg" "*.jpeg" "*.gif" "*.bmp" "*.tiff" "*.webp"
+    "*.mp4" "*.mp3" "*.avi" "*.mov" "*.mkv" "*.wav" "*.flac"
+    "*.pdf" "*.doc" "*.docx" "*.xls" "*.xlsx" "*.ppt" "*.pptx"
+  )
 
   _snap_usage() {
     cat <<EOF
@@ -21,13 +36,21 @@ Concatenates readable source/text files into one snapshot file.
 
 Options:
   --output <file>         Set output file path (default: ./snap.txt)
-  --exclude-exts <exts>   Exclude files with these extensions (e.g., mp3,wav,jpg)
+  --include <pattern>     Include files matching this glob pattern (repeatable)
+  --exclude <pattern>     Exclude files matching this glob pattern (repeatable)
   --exclude-git-log       Omit the Git log section (included by default)
-  --verbose               Enable verbose logging for debugging
   --help                  Show this help message
 
-Example:
-  snap --output combined.txt --exclude-exts mp3,wav,jpg,png --verbose
+Examples:
+  snap                                    # Basic usage with sensible defaults
+  snap --include "vendor/**/*.go"         # Rescue Go files from excluded vendor/
+  snap --exclude "**/*_test.py"           # Exclude test files beyond defaults
+  snap --output project.txt --include "src/**/*.{js,ts}" --exclude "src/**/*.spec.js"
+
+Default exclusions: .git/, node_modules/, build directories, caches, logs, and binary files.
+Include patterns override excludes (useful for rescuing specific files from excluded directories).
+
+Binary files are listed but their content is omitted for readability.
 EOF
   }
 
@@ -36,34 +59,79 @@ EOF
     return 1
   }
 
-  _snap_log() {
-    $verbose && echo "snap: $1" >&2
-  }
-
   _snap_is_text_file() {
-    local mime_type
-    mime_type=$(file --mime-type -b "$1" 2>/dev/null)
-    
-    # Include text files and some specific formats
-    case "$mime_type" in
-      text/*|application/json|application/xml|application/javascript|application/x-sh) 
-        _snap_log "Text file detected: $1 ($mime_type)"
-        return 0 ;;
-      *) 
-        _snap_log "Non-text file: $1 ($mime_type)"
-        return 1 ;;
-    esac
+    file --mime-type -b "$1" 2>/dev/null | grep -q '^text/'
   }
 
-  _snap_is_excluded_ext() {
-    local f="$1"
-    for ext in "${exclude_exts[@]}"; do
-      if [[ "$f" == *.$ext ]]; then
-        _snap_log "Excluded by extension '$ext': $f"
+  _snap_matches_pattern() {
+    local file="$1"
+    local pattern="$2"
+    local rel_path="${file#$abs_source_dir/}"
+    
+    # Use zsh's built-in pattern matching with extended_glob
+    setopt local_options extended_glob
+    [[ "$rel_path" == ${~pattern} ]]
+  }
+
+  _snap_is_binary_extension() {
+    local file="$1"
+    for pattern in "${binary_extensions[@]}"; do
+      if _snap_matches_pattern "$file" "$pattern"; then
         return 0
       fi
     done
     return 1
+  }
+
+  _snap_should_include() {
+    local f="$1"
+    local excluded=false
+    local rescued=false
+    
+    # Check default excludes first
+    for pattern in "${default_excludes[@]}"; do
+      if _snap_matches_pattern "$f" "$pattern"; then
+        excluded=true
+        break
+      fi
+    done
+    
+    # Check user excludes if not already excluded
+    if [[ "$excluded" != "true" ]]; then
+      for pattern in "${exclude_patterns[@]}"; do
+        if _snap_matches_pattern "$f" "$pattern"; then
+          excluded=true
+          break
+        fi
+      done
+    fi
+    
+    # If include patterns are specified, they work as RESCUE patterns
+    if [[ ${#include_patterns[@]} -gt 0 ]]; then
+      # Check if file matches any include pattern (rescues excluded files)
+      for pattern in "${include_patterns[@]}"; do
+        if _snap_matches_pattern "$f" "$pattern"; then
+          rescued=true
+          break
+        fi
+      done
+      
+      # Include file if either:
+      # 1. It was rescued by an include pattern, OR
+      # 2. It wasn't excluded in the first place
+      if [[ "$rescued" == "true" || "$excluded" != "true" ]]; then
+        return 0
+      else
+        return 1
+      fi
+    else
+      # No include patterns - just check exclusions
+      if [[ "$excluded" == "true" ]]; then
+        return 1
+      fi
+    fi
+    
+    return 0
   }
 
   while [[ $# -gt 0 ]]; do
@@ -74,18 +142,18 @@ EOF
         overwrite=true
         shift 2
         ;;
-      --exclude-exts)
-        [[ -z "$2" ]] && _snap_error "Missing value for --exclude-exts" && return 1
-        # Use zsh-compatible array splitting
-        exclude_exts=("${(@s/,/)2}")
+      --include)
+        [[ -z "$2" ]] && _snap_error "Missing value for --include" && return 1
+        include_patterns+=("$2")
+        shift 2
+        ;;
+      --exclude)
+        [[ -z "$2" ]] && _snap_error "Missing value for --exclude" && return 1
+        exclude_patterns+=("$2")
         shift 2
         ;;
       --exclude-git-log)
         include_git_log=false
-        shift
-        ;;
-      --verbose)
-        verbose=true
         shift
         ;;
       --help)
@@ -103,15 +171,9 @@ EOF
   done
 
   [[ ! -d "$source_dir" ]] && _snap_error "Directory '$source_dir' does not exist" && return 1
-  
   local abs_source_dir abs_output_file
   abs_source_dir="$(cd "$source_dir" && pwd)"
   abs_output_file="$(realpath "$output_file")"
-
-  _snap_log "Source directory: $abs_source_dir"
-  _snap_log "Output file: $abs_output_file"
-  _snap_log "Include git log: $include_git_log"
-  _snap_log "Excluded extensions: ${exclude_exts[*]:-"none"}"
 
   if [[ "$abs_output_file" != "$PWD/snap.txt" && "$overwrite" != true && -f "$abs_output_file" ]]; then
     _snap_error "Refusing to overwrite existing file '$abs_output_file'. Use --output to override." && return 1
@@ -121,76 +183,30 @@ EOF
 
   # Git log section
   if $include_git_log && [[ -d "$abs_source_dir/.git" ]]; then
-    _snap_log "Adding git log section"
     echo "# Git Log (git adog3)" >> "$abs_output_file"
     git -C "$abs_source_dir" log --all --decorate --oneline --graph >> "$abs_output_file"
     echo -e "\n# ----------------------------------------\n" >> "$abs_output_file"
-  else
-    _snap_log "Skipping git log (not enabled or no .git directory)"
   fi
 
-  # File processing counters
-  local text_files=0 binary_files=0 excluded_files=0 total_files=0
+  # Concatenate project files
+  find "$abs_source_dir" -type f | sort | while IFS= read -r file; do
+    [[ "$(realpath "$file")" == "$abs_output_file" ]] && continue
+    _snap_should_include "$file" || continue
 
-  # Build find command to exclude common directories and find only files
-  local find_cmd=(
-    find "$abs_source_dir"
-    -name ".git" -prune -o
-    -name "node_modules" -prune -o
-    -name ".venv" -prune -o
-    -name "venv" -prune -o
-    -name "__pycache__" -prune -o
-    -name "dist" -prune -o
-    -name "build" -prune -o
-    -name ".next" -prune -o
-    -name "target" -prune -o
-    -type f -print0
-  )
-
-  _snap_log "Find command excludes: .git, node_modules, .venv, venv, __pycache__, dist, build, .next, target"
-  _snap_log "Find command: ${find_cmd[*]}"
-
-  # Process files efficiently with find exclusions
-  while IFS= read -r -d '' file; do
-    ((total_files++))
-    
-    if [[ "$(realpath "$file")" == "$abs_output_file" ]]; then
-      _snap_log "Skipping output file: $file"
-      continue
-    fi
-    
-    # Check excluded extensions
-    if _snap_is_excluded_ext "$file"; then
-      ((excluded_files++))
-      continue
-    fi
-    
     local rel_path="${file#$abs_source_dir/}"
     echo "# $rel_path" >> "$abs_output_file"
     
-    if _snap_is_text_file "$file"; then
-      # Include full content for text files
-      _snap_log "Processing text file: $rel_path"
+    # Check if it's a binary file by extension
+    if _snap_is_binary_extension "$file"; then
+      echo "[Binary file - content omitted]" >> "$abs_output_file"
+    elif _snap_is_text_file "$file"; then
       cat "$file" >> "$abs_output_file"
-      ((text_files++))
     else
-      # Reference-only for non-text files
-      local mime_type=$(file --mime-type -b "$file" 2>/dev/null || echo "unknown")
-      _snap_log "Non-text file referenced: $rel_path ($mime_type)"
-      echo "# [Non-text file: $mime_type - content excluded]" >> "$abs_output_file"
-      ((binary_files++))
+      echo "[Non-text file - content omitted]" >> "$abs_output_file"
     fi
     
     echo -e "\n\n" >> "$abs_output_file"
-  done < <("${find_cmd[@]}")
+  done
 
-  # Summary
   echo "Files concatenated to $abs_output_file"
-  if $verbose; then
-    echo "Summary:"
-    echo "  Total files found: $total_files"
-    echo "  Text files processed: $text_files"
-    echo "  Non-text files referenced: $binary_files"
-    echo "  Files excluded by extension: $excluded_files"
-  fi
 }
