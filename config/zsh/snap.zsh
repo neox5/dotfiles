@@ -60,7 +60,7 @@ EOF
   }
 
   _snap_is_text_file() {
-    file --mime-type -b "$1" 2>/dev/null | grep -q '^text/'
+    file --mime-type -b "$1" 2>/dev/null | grep -q -E '^(text/|application/json)'
   }
 
   _snap_matches_pattern() {
