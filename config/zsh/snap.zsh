@@ -63,6 +63,29 @@ EOF
     file --mime-type -b "$1" 2>/dev/null | grep -q -E '^(text/|application/json)'
   }
 
+  _snap_is_known_text_extension() {
+    local file="$1"
+    local text_extensions=(
+      "*.md" "*.txt" "*.json" "*.yaml" "*.yml" "*.toml" "*.ini" "*.conf" "*.cfg"
+      "*.sh" "*.bash" "*.zsh" "*.fish"
+      "*.c" "*.h" "*.cpp" "*.hpp" "*.cc" "*.cxx"
+      "*.go" "*.rs" "*.py" "*.rb" "*.pl" "*.php"
+      "*.js" "*.ts" "*.jsx" "*.tsx" "*.mjs" "*.cjs"
+      "*.lua" "*.vim" "*.el" "*.clj" "*.cljs"
+      "*.html" "*.xml" "*.css" "*.scss" "*.sass" "*.less"
+      "*.sql" "*.graphql" "*.proto"
+      "*.Dockerfile" "Dockerfile" "Makefile" "*.mk"
+      ".gitignore" ".dockerignore" ".editorconfig" ".eslintrc" ".prettierrc"
+    )
+    
+    for pattern in "${text_extensions[@]}"; do
+      if _snap_matches_pattern "$file" "$pattern"; then
+        return 0
+      fi
+    done
+    return 1
+  }
+
   _snap_matches_pattern() {
     local file="$1"
     local pattern="$2"
@@ -199,6 +222,8 @@ EOF
     # Check if it's a binary file by extension
     if _snap_is_binary_extension "$file"; then
       echo "[Binary file - content omitted]" >> "$abs_output_file"
+    elif _snap_is_known_text_extension "$file"; then
+      cat "$file" >> "$abs_output_file"
     elif _snap_is_text_file "$file"; then
       cat "$file" >> "$abs_output_file"
     else
