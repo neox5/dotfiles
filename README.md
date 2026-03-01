@@ -8,8 +8,8 @@ These dotfiles are designed for portability, clarity, and ease of management acr
 
 ## 📦 What's Included
 
-| Module | Description                        | Status     |
-|--------|------------------------------------|------------|
+| Module | Description                            | Status      |
+| ------ | -------------------------------------- | ----------- |
 | `zsh`  | Shell configuration with Powerlevel10k | ✅ Complete |
 
 ---
@@ -82,8 +82,8 @@ scripts/<module>_status    # Required status script
 
 ### Script Responsibilities
 
-| Script                  | Role                                                            |
-|------------------------|------------------------------------------------------------------|
+| Script                 | Role                                                             |
+| ---------------------- | ---------------------------------------------------------------- |
 | `scripts/install.sh`   | Calls `<module>_install`                                         |
 | `scripts/uninstall.sh` | Calls `<module>_uninstall`                                       |
 | `scripts/status.sh`    | Calls `<module>_status`; handles all output formatting centrally |
