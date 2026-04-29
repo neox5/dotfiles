@@ -14,3 +14,7 @@ eval "$(pyenv init -)"
 # Rust environment
 export CARGO="$HOME/.cargo"
 export PATH="$CARGO/bin:$PATH"
+
+# Bun environment
+export BUN="$HOME/.bun"
+export PATH="$BUN/bin:$PATH"
