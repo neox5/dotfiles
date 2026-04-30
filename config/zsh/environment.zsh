@@ -15,6 +15,9 @@ eval "$(pyenv init -)"
 export CARGO="$HOME/.cargo"
 export PATH="$CARGO/bin:$PATH"
 
+# Node Version Manager
+source /usr/share/nvm/init-nvm.sh
+
 # Bun environment
 export BUN="$HOME/.bun"
 export PATH="$BUN/bin:$PATH"
