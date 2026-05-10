@@ -17,52 +17,62 @@ mdapply() {
   local input
   input=$(_mdapply_get_clipboard) || return 1
 
-  local lines
-  lines=$(echo "$input" | wc -l)
-  echo "mdapply: got ${lines} lines from clipboard"
+  echo "mdapply: got $(echo "$input" | wc -l) lines from clipboard"
 
-  echo "$input" | awk '
-  /^## (create|modify|delete) - / {
-      action = $2
-      filepath = $4
-      gsub(/^["'"'"']|["'"'"']$/, "", filepath)
-      if (substr(filepath, 1, 1) == "/") {
-          print "mdapply: warning - skipping absolute path: " filepath
-          action = ""
-          filepath = ""
-          next
-      }
-      if (action == "delete") {
-          system("rm -f \"" filepath "\"")
-          print "mdapply: done   delete " filepath
-          action = ""
-          filepath = ""
-      } else {
-          waiting = 1
-      }
-      next
-  }
-  /^```/ {
-      if (in_code) {
-          sub(/\n$/, "", content)
-          dir = filepath
-          sub(/[^/]*$/, "", dir)
-          if (dir != "") system("mkdir -p \"" dir "\"")
-          print content > filepath
-          close(filepath)
-          print "mdapply: done   " action " " filepath
-          action = ""
-          filepath = ""
-          content = ""
-          in_code = 0
-      } else if (waiting) {
-          in_code = 1
-          waiting = 0
-          content = ""
-      }
-      next
-  }
-  in_code {
-      content = content $0 "\n"
-  }'
+  local state="IDLE"
+  local action=""
+  local filepath=""
+  local -a content
+
+  while IFS= read -r line; do
+    case "$state" in
+      IDLE|WAITING)
+        if [[ "$line" =~ '^## (create|modify|delete) - ([^ ]+)' ]]; then
+          action="${match[1]}"
+          filepath="${match[2]}"
+
+          if [[ "$filepath" == /* ]]; then
+            echo "mdapply: warning - skipping absolute path: $filepath"
+            action=""
+            filepath=""
+            state="IDLE"
+            continue
+          fi
+
+          if [[ "$action" == "delete" ]]; then
+            rm -f "$filepath"
+            echo "mdapply: done   delete $filepath"
+            action=""
+            filepath=""
+            state="IDLE"
+          else
+            state="WAITING"
+          fi
+
+        elif [[ "$state" == "WAITING" && "$line" == '```'* ]]; then
+          content=()
+          state="CAPTURING"
+        fi
+        ;;
+
+      CAPTURING)
+        if [[ "$line" == '```'* ]]; then
+          local dir="${filepath%/*}"
+          if [[ "$dir" != "$filepath" ]]; then
+            mkdir -p "$dir"
+          fi
+
+          printf "%s\n" "${content[@]}" > "$filepath"
+
+          echo "mdapply: done   $action $filepath"
+          action=""
+          filepath=""
+          content=()
+          state="IDLE"
+        else
+          content+=("$line")
+        fi
+        ;;
+    esac
+  done <<< "$input"
 }
