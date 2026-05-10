@@ -21,3 +21,6 @@ source /usr/share/nvm/init-nvm.sh
 # Bun environment
 export BUN="$HOME/.bun"
 export PATH="$BUN/bin:$PATH"
+
+# bun completions
+[ -s "/home/neox5/.bun/_bun" ] && source "/home/neox5/.bun/_bun"
