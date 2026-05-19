@@ -22,12 +22,13 @@ mdapply() {
   local state="IDLE"
   local action=""
   local filepath=""
+  local src_filepath=""
   local -a content
 
   while IFS= read -r line; do
     case "$state" in
       IDLE|WAITING)
-        if [[ "$line" =~ '^## (create|modify|delete) - ([^ ]+)' ]]; then
+        if [[ "$line" =~ '^## (create|modify|delete|move|copy) - ([^ ]+)' ]]; then
           action="${match[1]}"
           filepath="${match[2]}"
 
@@ -39,19 +40,63 @@ mdapply() {
             continue
           fi
 
-          if [[ "$action" == "delete" ]]; then
-            rm -f "$filepath"
-            echo "mdapply: done   delete $filepath"
-            action=""
-            filepath=""
-            state="IDLE"
-          else
-            state="WAITING"
-          fi
+          case "$action" in
+            delete)
+              rm -f "$filepath"
+              echo "mdapply: done   delete $filepath"
+              action=""
+              filepath=""
+              state="IDLE"
+              ;;
+            move|copy)
+              src_filepath="$filepath"
+              filepath=""
+              state="AWAITING_TO"
+              ;;
+            create|modify)
+              state="WAITING"
+              ;;
+          esac
 
         elif [[ "$state" == "WAITING" && "$line" == '```'* ]]; then
           content=()
           state="CAPTURING"
+        fi
+        ;;
+
+      AWAITING_TO)
+        if [[ "$line" =~ '^## to - ([^ ]+)' ]]; then
+          local dst_filepath="${match[1]}"
+
+          if [[ "$dst_filepath" == /* ]]; then
+            echo "mdapply: warning - skipping absolute path: $dst_filepath"
+            action=""
+            src_filepath=""
+            state="IDLE"
+            continue
+          fi
+
+          local dst_dir="${dst_filepath%/*}"
+          if [[ "$dst_dir" != "$dst_filepath" ]]; then
+            mkdir -p "$dst_dir"
+          fi
+
+          if [[ "$action" == "move" ]]; then
+            mv "$src_filepath" "$dst_filepath"
+            echo "mdapply: done   move $src_filepath -> $dst_filepath"
+          else
+            cp "$src_filepath" "$dst_filepath"
+            echo "mdapply: done   copy $src_filepath -> $dst_filepath"
+          fi
+
+          action=""
+          src_filepath=""
+          state="IDLE"
+        else
+          echo "mdapply: warning - expected '## to - <path>' after $action, got: $line"
+          action=""
+          src_filepath=""
+          state="IDLE"
         fi
         ;;
 
