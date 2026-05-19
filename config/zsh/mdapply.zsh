@@ -42,7 +42,11 @@ mdapply() {
 
           case "$action" in
             delete)
-              rm -f "$filepath"
+              if [[ -d "$filepath" ]]; then
+                rm -rf "$filepath"
+              else
+                rm -f "$filepath"
+              fi
               echo "mdapply: done   delete $filepath"
               action=""
               filepath=""
