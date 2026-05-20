@@ -28,7 +28,7 @@ mdapply() {
   while IFS= read -r line; do
     case "$state" in
       IDLE|WAITING)
-        if [[ "$line" =~ '^## (create|modify|delete|move|copy) - ([^ ]+)' ]]; then
+        if [[ "$line" =~ '^## (create|modify|delete|move|copy) - `?([^ `]+)`?' ]]; then
           action="${match[1]}"
           filepath="${match[2]}"
 
@@ -69,7 +69,7 @@ mdapply() {
         ;;
 
       AWAITING_TO)
-        if [[ "$line" =~ '^## to - ([^ ]+)' ]]; then
+        if [[ "$line" =~ '^## to - `?([^ `]+)`?' ]]; then
           local dst_filepath="${match[1]}"
 
           if [[ "$dst_filepath" == /* ]]; then
