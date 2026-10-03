@@ -13,6 +13,26 @@ mdapply() {
       return 1
     fi
   }
+  # Write the captured block to $filepath and reset capture state.
+  # Relies on zsh dynamic scoping: reads/writes mdapply's locals.
+  _mdapply_flush() {
+    if (( ${#content} == 0 )); then
+      echo "mdapply: warning - empty capture for $action $filepath, discarded"
+    else
+      local dir="${filepath%/*}"
+      if [[ "$dir" != "$filepath" ]]; then
+        mkdir -p "$dir"
+      fi
+      printf "%s\n" "${content[@]}" > "$filepath"
+      echo "mdapply: done   $action $filepath"
+    fi
+    action=""
+    filepath=""
+    in_nested=false
+    fence_len=3
+    content=()
+    state="IDLE"
+  }
   local input
   input=$(_mdapply_get_clipboard) || return 1
   echo "mdapply: got $(echo "$input" | wc -l) lines from clipboard"
@@ -21,6 +41,8 @@ mdapply() {
   local filepath=""
   local src_filepath=""
   local in_nested=false
+  local fence_len=3
+  local bt='`'
   local -a content
   while IFS= read -r line; do
     case "$state" in
@@ -59,6 +81,8 @@ mdapply() {
         elif [[ "$state" == "WAITING" && "$line" == '```'* ]]; then
           content=()
           in_nested=false
+          local lead="${line%%[^$bt]*}"
+          fence_len=${#lead}
           state="CAPTURING"
         fi
         ;;
@@ -94,7 +118,15 @@ mdapply() {
         fi
         ;;
       CAPTURING)
-        if [[ "$line" =~ '^```[a-zA-Z]+' ]]; then
+        if (( fence_len > 3 )); then
+          # Long outer fence (CommonMark): only a bare backtick line of at
+          # least the opening length closes it; everything else is content.
+          if [[ "$line" =~ '^`+$' ]] && (( ${#line} >= fence_len )); then
+            _mdapply_flush
+          else
+            content+=("$line")
+          fi
+        elif [[ "$line" =~ '^```[a-zA-Z]+' ]]; then
           in_nested=true
           content+=("$line")
         elif [[ "$line" == '```' ]]; then
@@ -102,21 +134,7 @@ mdapply() {
             in_nested=false
             content+=("$line")
           else
-            if (( ${#content} == 0 )); then
-              echo "mdapply: warning - empty capture for $action $filepath, discarded"
-            else
-              local dir="${filepath%/*}"
-              if [[ "$dir" != "$filepath" ]]; then
-                mkdir -p "$dir"
-              fi
-              printf "%s\n" "${content[@]}" > "$filepath"
-              echo "mdapply: done   $action $filepath"
-            fi
-            action=""
-            filepath=""
-            in_nested=false
-            content=()
-            state="IDLE"
+            _mdapply_flush
           fi
         else
           content+=("$line")
