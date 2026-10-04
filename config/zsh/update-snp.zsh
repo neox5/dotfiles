@@ -16,6 +16,7 @@ SNP_PROJECTS[ansible]="
   ansible-collection-platform
   ansible-collection-overlay
   ansible-site-starter
+  ansible-zion
   ssh-public-keys-starter
   ansible:ansible-ref
 "
