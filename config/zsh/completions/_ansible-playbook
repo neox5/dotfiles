@@ -1,0 +1,12 @@
+#compdef ansible-playbook
+
+local -a playbooks
+local file collection
+
+for file in ./.collections/ansible_collections/neox5/*/playbooks/*.(yaml|yml)(N); do
+  collection=${file:h:h:t}
+  playbooks+=("neox5.${collection}.${file:t:r}")
+done
+
+_describe 'collection playbook' playbooks
+_files
