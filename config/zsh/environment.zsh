@@ -1,5 +1,5 @@
 export EDITOR="nvim"
-export PATH="$HOME/bin:$PATH"
+export PATH="$HOME/.local/bin:$PATH"
 
 # Go environment
 export GOPATH="$HOME/go"
