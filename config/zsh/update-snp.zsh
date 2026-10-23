@@ -15,8 +15,10 @@ typeset -gA SNP_PROJECTS
 SNP_PROJECTS[ansible]="
   ansible-collection-platform
   ansible-collection-overlay
+  ansible-collection-routeros
   ansible-site-starter
   ansible-zion
+  network-zion
   ssh-public-keys-starter
   ansible:ansible-ref
 "
