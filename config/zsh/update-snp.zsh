@@ -13,6 +13,7 @@ SNP_BASE=${SNP_BASE:-$HOME/dev/codeberg.org/neox5}
 # (default snapshot name: <repo dir>); it is copied under the same name.
 typeset -gA SNP_PROJECTS
 SNP_PROJECTS[ansible]="
+  ansible-collection-identity
   ansible-collection-platform
   ansible-collection-overlay
   ansible-collection-routeros
